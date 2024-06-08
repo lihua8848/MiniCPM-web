@@ -31,15 +31,19 @@ chmod 755 obsutil
 
 ./obsutil cp -f obs://huawei-b127/MiniCPM-Llama3-V-2_5/ /path/to/data/
 ```
-7. 下载代码到/path/to/data/
+7. 解压screenshots数据于/data/
+```
+unzip screenshots_16w.zip
+```
+8. 下载代码到/path/to/data/
 ```
 git clone https://github.com/lihua8848/MiniCPM-web.git
 ```
-8. 安装镜像
+9. 安装镜像
 ```
 docker load -i /path/to/docker/minicpm_docker.tar
 ```
-9. 启动容器
+10. 启动容器
 ```
 docker run --gpus all -dit --shm-size=[内存大小]g --net=host -v /path/to/data/:/data  --name=minicpm 容器id
 ```
