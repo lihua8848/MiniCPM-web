@@ -19,7 +19,7 @@ chmod 755 obsutil
 ```
 ./obsutil config -i=ak -k=sk -e=endpoint
 ```
-6. 下载docker镜像，数据
+6. 下载docker镜像，数据，模型
 ```
 ./obsutil cp -f obs://lxy-obs/minicpm_docker.tar /path/to/docker/
 
@@ -28,17 +28,18 @@ chmod 755 obsutil
 ./obsutil cp -f obs://lxy-obs/train_reverse_html_qa_imgtoken_164600_minicpm.json /path/to/data/
 
 ./obsutil cp -f obs://lxy-obs/train_reverse_html_qa_imgtoken_1000_minicpm_test.json /path/to/data/
+
+./obsutil cp -f obs://huawei-b127/MiniCPM-Llama3-V-2_5/ /path/to/data/
 ```
 7. 下载代码到/path/to/data/
 ```
 git clone https://github.com/lihua8848/MiniCPM-web.git
 ```
-
-7. 安装镜像
+8. 安装镜像
 ```
 docker load -i /path/to/docker/minicpm_docker.tar
 ```
-8. 启动容器
+9. 启动容器
 ```
 docker run --gpus all -dit --shm-size=[内存大小]g --net=host -v /path/to/data/:/data  --name=minicpm 容器id
 ```
