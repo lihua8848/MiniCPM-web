@@ -6,11 +6,11 @@ NODE_RANK=0
 MASTER_ADDR=localhost
 MASTER_PORT=6001
 
-MODEL="openbmb/MiniCPM-Llama3-V-2_5" # or openbmb/MiniCPM-V-2
+MODEL="/data/MiniCPM-Llama3-V-2_5" # or openbmb/MiniCPM-V-2
 # ATTENTION: specify the path to your training data, which should be a json file consisting of a list of conversations.
 # See the section for finetuning in README for more information.
-DATA="path/to/trainging_data"
-EVAL_DATA="path/to/test_data"
+DATA="/data/train_reverse_html_qa_imgtoken_164600_minicpm.json"
+EVAL_DATA="/data/train_reverse_html_qa_imgtoken_1000_minicpm_test.json"
 LLM_TYPE="llama3" # if use openbmb/MiniCPM-V-2, please set LLM_TYPE=minicpm
 
 DISTRIBUTED_ARGS="
@@ -38,14 +38,14 @@ torchrun $DISTRIBUTED_ARGS finetune.py  \
     --tune_llm false \
     --use_lora true \
     --lora_target_modules "llm\..*layers\.\d+\.self_attn\.(q_proj|k_proj)" \
-    --model_max_length 2048 \
-    --max_slice_nums 9 \
-    --max_steps 10000 \
+    --model_max_length 4096 \
+    --max_slice_nums 6 \
+    --max_steps 16000 \
     --eval_steps 1000 \
     --output_dir output/output_minicpmv2_lora \
     --logging_dir output/output_minicpmv2_lora \
     --logging_strategy "steps" \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 10 \
     --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "steps" \
