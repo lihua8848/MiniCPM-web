@@ -34,8 +34,7 @@ chmod 755 obsutil
 ```
 unzip screenshots_16w.zip
 ```
-8. docker镜像
-复制Dockerfile
+8. 编写Dockerfile
 ```
 FROM nvidia/cuda:12.3.2-cudnn9-devel-ubuntu20.04
 
@@ -62,92 +61,92 @@ RUN pip install deepspeed
 RUN pip install peft
 RUN pip install tensorboard
 
+WORKDIR /root/MiniCPM-V/finetune
+RUN rm -f finetune_lora.sh
+RUN printf '#!/bin/bash\n\n\
+GPUS_PER_NODE=8\n\
+NNODES=1\n\
+NODE_RANK=0\n\
+MASTER_ADDR=localhost\n\
+MASTER_PORT=6001\n\n\
+MODEL="/data/MiniCPM-Llama3-V-2_5"\n\
+DATA="/data/train_reverse_html_qa_imgtoken_164600_minicpm.json"\n\
+EVAL_DATA="/data/train_reverse_html_qa_imgtoken_1000_minicpm_test.json"\n\
+LLM_TYPE="llama3"\n\n\
+DISTRIBUTED_ARGS="\n\
+    --nproc_per_node $GPUS_PER_NODE \\\n\
+    --nnodes $NNODES \\\n\
+    --node_rank $NODE_RANK \\\n\
+    --master_addr $MASTER_ADDR \\\n\
+    --master_port $MASTER_PORT\n\
+"\n\
+torchrun $DISTRIBUTED_ARGS finetune.py  \\\n\
+    --model_name_or_path $MODEL \\\n\
+    --llm_type $LLM_TYPE \\\n\
+    --data_path $DATA \\\n\
+    --eval_data_path $EVAL_DATA \\\n\
+    --remove_unused_columns false \\\n\
+    --label_names "labels" \\\n\
+    --prediction_loss_only false \\\n\
+    --bf16 false \\\n\
+    --bf16_full_eval false \\\n\
+    --fp16 true \\\n\
+    --fp16_full_eval true \\\n\
+    --do_train \\\n\
+    --do_eval \\\n\
+    --tune_vision true \\\n\
+    --tune_llm false \\\n\
+    --use_lora true \\\n\
+    --lora_target_modules "llm\..*layers\.\d+\.self_attn\.(q_proj|k_proj)" \\\n\
+    --model_max_length 4096 \\\n\
+    --max_slice_nums 9 \\\n\
+    --max_steps 26000 \\\n\
+    --eval_steps 1000 \\\n\
+    --output_dir output/output_minicpmv2_lora \\\n\
+    --logging_dir output/output_minicpmv2_lora \\\n\
+    --logging_strategy "steps" \\\n\
+    --per_device_train_batch_size 6 \\\n\
+    --per_device_eval_batch_size 1 \\\n\
+    --gradient_accumulation_steps 1 \\\n\
+    --evaluation_strategy "steps" \\\n\
+    --save_strategy "steps" \\\n\
+    --save_steps 1000 \\\n\
+    --save_total_limit 10 \\\n\
+    --learning_rate 1e-6 \\\n\
+    --weight_decay 0.1 \\\n\
+    --adam_beta2 0.95 \\\n\
+    --warmup_ratio 0.01 \\\n\
+    --lr_scheduler_type "cosine" \\\n\
+    --logging_steps 1 \\\n\
+    --gradient_checkpointing true \\\n\
+    --deepspeed ds_config_zero2.json \\\n\
+    --report_to "tensorboard"' > finetune_lora.sh
+
+
 ENV CONDA_DEFAULT_ENV=MiniCPM-V
 ENV PATH /root/miniconda3/envs/MiniCPM-V/bin:$PATH
 
 CMD [ "bash" ]
 ```
-构建镜像
+
+9. 构建镜像
 ```
 docker build -t minicmp-v:latest .
 ```
-9. 启动容器
+10. 启动容器
 ```
 docker run --gpus all -dit --shm-size=[内存大小]g --net=host -v /path/to/data/:/data  --name=minicpm 镜像id
 ```
 # 训练
 1. 进入容器/root/MiniCPM-V/finetune
-2. 覆盖finetune_lora.sh为
-可根据卡数调整GPUS_PER_NODE=8
-可根据显存大小调整per_device_train_batch_size
+2. 修改finetune_lora.sh参数
+- 可根据卡数调整GPUS_PER_NODE
+- 可根据显存大小调整per_device_train_batch_size
 
-若是8卡a100 80G，则建议直接复制下面代码
-```
-#!/bin/bash
+- 若是8卡a100 80G，则建议直接运行下面代码
+- 若是8卡a100 40G，则建议修改per_device_train_batch_size=3，max_steps=54000
 
-GPUS_PER_NODE=8
-NNODES=1
-NODE_RANK=0
-MASTER_ADDR=localhost
-MASTER_PORT=6001
-
-MODEL="/data/MiniCPM-Llama3-V-2_5" # or openbmb/MiniCPM-V-2
-# ATTENTION: specify the path to your training data, which should be a json file consisting of a list of conversations.
-# See the section for finetuning in README for more information.
-DATA="/data/train_reverse_html_qa_imgtoken_164600_minicpm.json"
-EVAL_DATA="/data/train_reverse_html_qa_imgtoken_1000_minicpm_test.json"
-LLM_TYPE="llama3" # if use openbmb/MiniCPM-V-2, please set LLM_TYPE=minicpm
-
-DISTRIBUTED_ARGS="
-    --nproc_per_node $GPUS_PER_NODE \
-    --nnodes $NNODES \
-    --node_rank $NODE_RANK \
-    --master_addr $MASTER_ADDR \
-    --master_port $MASTER_PORT
-"
-torchrun $DISTRIBUTED_ARGS finetune.py  \
-    --model_name_or_path $MODEL \
-    --llm_type $LLM_TYPE \
-    --data_path $DATA \
-    --eval_data_path $EVAL_DATA \
-    --remove_unused_columns false \
-    --label_names "labels" \
-    --prediction_loss_only false \
-    --bf16 false \
-    --bf16_full_eval false \
-    --fp16 true \
-    --fp16_full_eval true \
-    --do_train \
-    --do_eval \
-    --tune_vision true \
-    --tune_llm false \
-    --use_lora true \
-    --lora_target_modules "llm\..*layers\.\d+\.self_attn\.(q_proj|k_proj)" \
-    --model_max_length 4096 \
-    --max_slice_nums 9 \
-    --max_steps 26000 \
-    --eval_steps 1000 \
-    --output_dir output/output_minicpmv2_lora \
-    --logging_dir output/output_minicpmv2_lora \
-    --logging_strategy "steps" \
-    --per_device_train_batch_size 6 \
-    --per_device_eval_batch_size 1 \
-    --gradient_accumulation_steps 1 \
-    --evaluation_strategy "steps" \
-    --save_strategy "steps" \
-    --save_steps 1000 \
-    --save_total_limit 10 \
-    --learning_rate 1e-6 \
-    --weight_decay 0.1 \
-    --adam_beta2 0.95 \
-    --warmup_ratio 0.01 \
-    --lr_scheduler_type "cosine" \
-    --logging_steps 1 \
-    --gradient_checkpointing true \
-    --deepspeed ds_config_zero2.json \
-    --report_to "tensorboard" # wandb
-```
-2. 在/data/MiniCPM-V/finetune下面运行shell脚本
+3. 在/data/MiniCPM-V/finetune下面运行shell脚本
 ```
 sh finetune_lora.sh
 ```
