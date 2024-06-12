@@ -146,7 +146,7 @@ docker run --gpus all -dit --shm-size=[内存大小]g --net=host -v /path/to/dat
 - 若是8卡a100 80G，则建议直接运行下面代码
 - 若是8卡a100 40G，则建议修改per_device_train_batch_size=3，max_steps=54000
 
-3. 在/data/MiniCPM-V/finetune下面运行shell脚本
+3. 在/root/MiniCPM-V/finetune下面运行shell脚本
 ```
 sh finetune_lora.sh
 ```
