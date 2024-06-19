@@ -150,3 +150,144 @@ docker run --gpus all -dit --shm-size=[内存大小]g --net=host -v /path/to/dat
 ```
 sh finetune_lora.sh
 ```
+
+# 测试
+1. 测试数据下载
+```
+./obsutil cp -r -f obs://huawei-b127/Design2code/Design2Code/ /path/to/data/
+
+./obsutil cp -r -f obs://lxy-obs/test_d2code/ /path/to/data/
+```
+
+2. 测试代码
+- /root/MiniCPM-V/infer_web.py
+```
+from peft import AutoPeftModelForCausalLM
+from transformers import AutoTokenizer
+from chat import img2base64
+import json
+import torch
+from PIL import Image
+import os
+import tqdm
+
+def gen_html(img_path, output_dir, model, tokenizer):
+    image = Image.open(img_path).convert('RGB')
+    question = 'Write the HTML code.'
+    msgs = [{'role': 'user', 'content': question}]
+
+    res = model.chat(
+        image=image,
+        msgs=msgs,
+        tokenizer=tokenizer,
+        sampling=True, # if sampling=False, beam_search will be used by default
+        temperature=0.7,
+        max_new_tokens=4096,
+        # system_prompt='' # pass system_prompt if needed
+    )
+
+    with open(os.path.join(output_dir, os.path.basename(img_path).split(".png")[0] + ".html"), "w") as f:
+        f.write(res)
+    # print(answer)
+#processbar
+# for _ in tqdm.tqdm(imgs):
+#     gen_html(_)
+
+if __name__ == "__main__":
+    #增加参数
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--img_file", type=str, default="/root/MiniCPM-V/img1.txt")
+    parser.add_argument("--output_dir", type=str, default="/root/MiniCPM-V/rs_cpm_finetune/")
+    parser.add_argument("--path_to_checkpoint", type=str, default="/root/MiniCPM-V/finetune/output/output_minicpmv2_lora/checkpoint-7000")
+    args = parser.parse_args()
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    with open(args.img_file, "r") as f:
+        img_files = f.readlines()
+        img_files = [img_file.strip() for img_file in img_files]
+
+    path_to_adapter=args.path_to_checkpoint
+
+    model = AutoPeftModelForCausalLM.from_pretrained(
+        # path to the output directory
+        path_to_adapter,
+        device_map="auto",
+        trust_remote_code=True
+    ).eval()
+
+    vpm_resampler_embedtokens_weight = torch.load(f"{path_to_adapter}/vpm_resampler_embedtokens.pt")
+    tokenizer = AutoTokenizer.from_pretrained(path_to_adapter, trust_remote_code=True)
+
+    msg = model.load_state_dict(vpm_resampler_embedtokens_weight, strict=False)
+
+    #processbar
+    for img_file in tqdm.tqdm(img_files):
+        gen_html(img_file, args.output_dir, model, tokenizer)
+```
+- /root/MiniCPM-V/infer_d2code.sh
+  - OUTPUT_DIR="/root/MiniCPM-V/rs_cpm_finetune_sampling_tune_visua_16_1epoch"  修改为输出路径
+  - CHECKPOINT="/root/MiniCPM-V/output/output_minicpmv2_lora/checkpoint-xxx"  修改为对应的权重
+  - 做以下三个测试，在infer_d2code.sh，修改OUTPUT_DIR，CHECKPOINT
+     - 1epoch：checkpoint-xxx
+     - 2epoch: checkpoint-xxx
+     - 3epoch: checkpoint-xxx
+     - 可能得看日志对应起来，checkpoint取1000的倍数
+```
+
+IMAGE_FILE1="/data/test_d2code/img1.txt"
+IMAGE_FILE2="/data/test_d2code/img2.txt"
+IMAGE_FILE3="/data/test_d2code/img3.txt"
+IMAGE_FILE4="/data/test_d2code/img4.txt"
+IMAGE_FILE5="/data/test_d2code/img5.txt"
+IMAGE_FILE6="/data/test_d2code/img6.txt"
+IMAGE_FILE7="/data/test_d2code/img7.txt"
+IMAGE_FILE8="/data/test_d2code/img8.txt"
+OUTPUT_DIR="/root/MiniCPM-V/rs_cpm_finetune_sampling_tune_visua_16_1epoch"
+CHECKPOINT="/root/MiniCPM-V/output/output_minicpmv2_lora/checkpoint-xxx"
+cd /root/MiniCPM-V
+
+CUDA_VISIBLE_DEVICES=0 nohup python infer_web.py \
+    --img_file $IMAGE_FILE1 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=1 nohup python infer_web.py \
+    --img_file $IMAGE_FILE2 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=2 nohup python infer_web.py \
+    --img_file $IMAGE_FILE3 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=3 nohup python infer_web.py \
+    --img_file $IMAGE_FILE4 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=4 nohup python infer_web.py \
+    --img_file $IMAGE_FILE5 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=5 nohup python infer_web.py \
+    --img_file $IMAGE_FILE6 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=6 nohup python infer_web.py \
+    --img_file $IMAGE_FILE7 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+
+CUDA_VISIBLE_DEVICES=7 nohup python infer_web.py \
+    --img_file $IMAGE_FILE8 \
+    --path_to_checkpoint $CHECKPOINT \
+    --output_dir $OUTPUT_DIR &
+```
+3. 运行测试
+```
+sh /root/MiniCPM-V/infer_d2code.sh
+```
